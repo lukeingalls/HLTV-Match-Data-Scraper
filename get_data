@@ -1,0 +1,186 @@
+import requests
+import bs4
+from sys import argv
+
+if (len(argv) >= 3):
+	team = ''
+	
+	url = 'https://www.hltv.org/stats/teams/'
+
+
+	response = requests.get(url)
+	orig_html=bs4.BeautifulSoup(response.text,'html.parser')
+	
+	for i in range(1, len(argv) - 1):
+		team += argv[i]
+		if (i < len(argv)-2):
+		 team += ' '
+	
+	max_matches = int(argv[-1])
+	counter = 0
+
+	base_url = 'https://www.hltv.org'
+
+	url = base_url
+
+	tab = orig_html.findAll('tr')
+	
+	for t in tab:
+		if team in t.get_text():
+			url += t.find('td').a['href']
+			break
+
+
+	url_chuncks = url.split('/')
+	url_chuncks.insert(5, 'matches')
+	
+	url = ''
+	for u in url_chuncks:
+		url += u + '/'
+	
+	response = requests.get(url)
+
+	html=bs4.BeautifulSoup(response.text,'html.parser')
+
+	table = html.find('tbody')
+	rows=table.findAll('tr')
+
+	matches = []
+
+	for r in rows:
+		col=r.findAll('td')
+		matches.append(base_url + col[0].a['href'])
+		
+	for m in matches:
+		new_url = m
+		new_response = requests.get(new_url)
+		new_html = bs4.BeautifulSoup(new_response.text, 'html.parser')
+		
+		outcome=new_html.findAll("div",{"class":"round-history-team-row"})
+		
+		search_team = outcome[0].findAll('img')[1:]
+		opponent = outcome[1].findAll('img')[1:]
+		
+		standings = ''
+
+		# Get the match results
+		for i in range(len(search_team)):
+			st_rec = search_team[i]['title']
+			op_rec = opponent[i]['title']
+			
+			if (st_rec != '' or op_rec != ''):
+				standings = st_rec if st_rec != '' else op_rec
+			else:
+				search_team = search_team[:i]
+				opponent = opponent[:i]
+				break
+		
+		# Translate images to win states
+		search_results = []
+		opponent_results = []
+
+		for result in search_team:
+			if 'bomb_defused' in result['src']:
+				search_results.append('defused')
+			elif 'ct_win' in result['src']:
+				search_results.append('counter-terrorists eliminated')
+			elif 't_win' in result['src']:
+				search_results.append('terrorists eliminated')
+			elif 'bomb_exploded' in result['src']:
+				search_results.append('bomb exploded')
+			elif 'stopwatch' in result['src']:
+				search_results.append('ran down the clock')
+			else:
+				search_results.append('round lost')
+
+		for result in opponent:
+			if 'bomb_defused' in result['src']:
+				opponent_results.append('defused')
+			elif 'ct_win' in result['src']:
+				opponent_results.append('counter-terrorists eliminated')
+			elif 't_win' in result['src']:
+				opponent_results.append('terrorists eliminated')
+			elif 'bomb_exploded' in result['src']:
+				opponent_results.append('bomb exploded')
+			elif 'stopwatch' in result['src']:
+				opponent_results.append('ran down the clock')
+			else:
+				opponent_results.append('round lost')
+				
+		# Parse Player Stat Tables
+		tables = new_html.findAll('table')
+
+		search_head = tables[0].find('thead').findAll('th')
+		opponent_head = tables[1].find('thead').findAll('th')
+
+		temp_search_stats = tables[0].find('tbody').findAll('tr')
+		temp_opponent_stats = tables[1].find('tbody').findAll('tr')
+		
+		# Cleanup the headers
+		for s in range(0, len(search_head)):
+			search_head[s] = search_head[s].get_text()
+
+		for s in range(0, len(opponent_head)):
+			opponent_head[s] = opponent_head[s].get_text()
+			
+		# Parse stats
+		search_stats = [None]*len(temp_search_stats)
+		opponent_stats = [None]*len(temp_opponent_stats)
+
+		for t in range(0, len(temp_search_stats)):
+			search_stats[t] = temp_search_stats[t].findAll('td')
+
+		for t in range(0, len(temp_opponent_stats)):
+			opponent_stats[t] = temp_opponent_stats[t].findAll('td')
+			
+		# Cleanup the stats
+		for i in range(0, len(search_stats)):
+			for j in range(0, len(search_stats[i])):
+				search_stats[i][j] = search_stats[i][j].get_text()
+
+		for i in range(0, len(opponent_stats)):
+			for j in range(0, len(opponent_stats[i])):
+				opponent_stats[i][j] = opponent_stats[i][j].get_text()
+				
+		f = open(team + ' ' + str(counter + 1) +'.csv', 'w')
+
+		for i in search_results:
+			f.write(i + ',')
+
+		f.write('\n')    
+
+		for i in opponent_results:
+			f.write(i + ',')
+
+		f.write('\n')
+		
+		f.write('Standings:,%s\n' % standings)
+		
+		for i in search_head:
+			f.write(i + ',')
+
+		f.write('\n')
+
+		for i in search_stats:
+			for j in i:
+				f.write(j + ',')
+			f.write('\n')
+
+		for i in opponent_head:
+			f.write(i + ',')
+
+		f.write('\n')
+
+		for i in opponent_stats:
+			for j in i:
+				f.write(j + ',')
+			f.write('\n')
+
+		f.close()
+		
+		counter+=1
+		
+		if (counter >= max_matches):
+			break
+else:
+	print('u dum')
