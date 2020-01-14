@@ -7,3 +7,6 @@ Examples:
 - Will retrieve the 10 most recent match data for Grayhound. 
 2. 'python get_data.py Natus Vincere 5'
 - Will retrueve Navis 5 most recent match data.
+
+
+## This looks to be no longer functional as HLTV has employed bot detection measures
